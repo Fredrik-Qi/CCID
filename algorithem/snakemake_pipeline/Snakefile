@@ -1,0 +1,311 @@
+
+# 1.Read the config file ------------------------------------------------------
+
+import yaml
+import os
+
+# 需要手动输入
+Program_path = "/mnt/data/user/zhouhui/CCID_pipeline"
+Configfile = os.path.join(Program_path, "config", "Tcell_dynamics.run.yaml")  
+algorithem_path = os.path.join(Program_path, "algorithem", "snakemake_pipeline")
+
+with open(Configfile, 'r') as f:
+    config = yaml.safe_load(f)
+
+
+
+# 1.Input files from config 基础信息 ----------------------------------------------
+# 输入文件和数据
+PROJECT_NAME = config['project']
+OUT_DIR = config['out_dir']
+ANNOTATION = config['annotation']
+CELLBCs_FOR_READSEPARATION = config['readseparation_barcode_list']
+
+GTF_FILE = config['reference']['GTF_file']
+REFERENCE_GENOME = config['reference']['reference_genome']
+REFERENCE_GENOME_INDEX = f"{REFERENCE_GENOME}.fai"
+THREADS = config['num_threads']
+ZUMIS_PATH = config['zUMIs_directory']
+
+# 2. Output files  ----------------------------------------------
+ZUMIS_OUTPUT_DIR = os.path.join(OUT_DIR, "zUMIs_output")
+os.makedirs(ZUMIS_OUTPUT_DIR, exist_ok=True)
+
+SPLIT_BAM_OUTPUT_DIR = os.path.join(OUT_DIR, "split_bam_output")
+os.makedirs(SPLIT_BAM_OUTPUT_DIR, exist_ok=True)
+
+SNP_CALLING_OUTPUT_DIR = os.path.join(OUT_DIR, "SNP_calling_output")
+os.makedirs(SNP_CALLING_OUTPUT_DIR, exist_ok=True)
+
+READ_SEPARATION_RESULTS_DIR = os.path.join(OUT_DIR, "read_separation_results")
+os.makedirs(READ_SEPARATION_RESULTS_DIR, exist_ok=True)
+
+
+
+
+# 3.代码 ----------------------------------------------
+# 0) zUMIs相关
+ZUMIS_SCRIPT = os.path.join(ZUMIS_PATH, "zUMIs.sh")
+
+# 1) SNP calling相关
+split_bam_script = os.path.join(algorithem_path, "SNP_calling", "extract_barcodes_and_split_bam.sh")
+FASTA_GENERATE_REGIONS_SCRIPT = os.path.join(algorithem_path, "SNP_calling", "fasta_generate_regions.py")
+
+# 2）Read separation相关
+SNP_distribution_per_gene_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "Doublets_Separation_Distribution_of_SNPs_in_genes_v0.2.R")
+Doublets_separation_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "DoubletsSeparation_SNPbased_v0.6.0_separation.R")
+Plotting_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "DoubletsSeparation_SNPbased_v0.6.0_plotting.R")
+Sub_bam_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "parallel_extract_bam.sh")
+
+
+
+# 4.程序生成的文件的信息标注  ----------------------------------------------
+
+# 1）zUMIs 产生的bam文件的路径
+ZUMIS_BAM = os.path.join(OUT_DIR, f"{PROJECT_NAME}.filtered.Aligned.GeneTagged.UBcorrected.sorted.bam")
+
+# 2）bam_split 产生的文件
+SPLIT_BAM_OUTPUT_T = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Tsc_subset_stats_all_0_cellBClist.txt")
+SPLIT_BAM_OUTPUT_NALM6 = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6sc_subset_stats_all_0_cellBClist.txt")
+SPLIT_BAM_OUTPUT_DOUBLETS = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6-T_subset_stats_all_0_cellBClist.txt")
+
+SPLIT_BAM_Tsc = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Tsc_subset.bam")
+SPLIT_BAM_Nalm6sc = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6sc_subset.bam")
+bamaddrg_combined_BAM = os.path.join(SPLIT_BAM_OUTPUT_DIR, "bamaddrg_output.bam")
+
+# 3）SNP calling
+VCF_FILE = os.path.join(SNP_CALLING_OUTPUT_DIR, f"{PROJECT_NAME}.vcf")
+TMP_REGION = os.path.join(SNP_CALLING_OUTPUT_DIR, "tmpregions")
+PROCESSED_VCF_FILE = os.path.join(SNP_CALLING_OUTPUT_DIR, f"{PROJECT_NAME}.processed.vcf")
+
+
+## 4）Output files for Rule SNP_distribution_per_gene ----------------------
+SNP_COUNTS_PER_GENE_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "snp_counts_per_gene.csv")
+COUNTS_DISTRIBUTION_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "snp_count_frequency_distribution.pdf")
+LOG_PATH_1 = os.path.join(READ_SEPARATION_RESULTS_DIR, "SNP_distribution_per_gene.processing_log.txt")
+
+# 5）Output files for Rule doublets_separation -----------------------------
+TEM_RDS_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.tmp.rds")
+COUNTS_RDS_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.separated_counts.rds")
+NALM6_READID_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Nalm6_readIDs.txt")
+Tsc_READID_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Tsc_readIDs.txt")
+LOG_PATH_2 = os.path.join(READ_SEPARATION_RESULTS_DIR, "doublets_separation.processing_log.txt")
+
+# 6）Output files for Rule doublets_separation_plotting -----------------------------
+READ_ASSIGNMENT_RESULT = os.path.join(READ_SEPARATION_RESULTS_DIR, "final_read_assignment_result_sorted.txt")
+SCATTER_PLOT_HTML = os.path.join(READ_SEPARATION_RESULTS_DIR, "scatterplots_summary.html")
+VIOLLIN_PLOT_HTML = os.path.join(READ_SEPARATION_RESULTS_DIR, "violin_plots_summary.html")
+LOG_PATH_3 = os.path.join(READ_SEPARATION_RESULTS_DIR, "doublets_separation_plotting.processing_log.txt")
+
+# 7) Output files for Rule read_separation_for_bam
+NALM6_SEPARATED_BAM_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Nalm6_readIDs_separated_bam.bam")
+Tsc_SEPARATED_BAM_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Tsc_readIDs_separated_bam.bam")
+
+
+
+rule extract_barcodes:
+    input:
+        barcode = ANNOTATION  
+    output:
+        SPLIT_BAM_OUTPUT_NALM6,
+        SPLIT_BAM_OUTPUT_T,
+        SPLIT_BAM_OUTPUT_DOUBLETS
+    params:
+        script = split_bam_script,  
+        output_path = SPLIT_BAM_OUTPUT_DIR  
+    log:
+        "logs/extract_barcodelist.log"
+    shell:
+        """
+        chmod +x {params.script}
+        bash {params.script} {input.barcode} {params.output_path}
+        """
+
+rule run_zUMIs:
+    input:
+        config_file = Configfile
+    params:
+        script = ZUMIS_SCRIPT
+    output:
+        ZUMIS_BAM
+    log:
+        "logs/zUMIs.log"
+    shell:
+        "{params.script} -c -y {input.config_file}"
+
+rule zUMIs_bam_index:
+    input:
+        ZUMIS_BAM
+    output:
+        ZUMIS_BAM + ".bai"
+    shell:
+        """
+        samtools index {input}
+        """
+
+rule split_bam:
+    input:
+        bam = ZUMIS_BAM,
+        bc_t = SPLIT_BAM_OUTPUT_T,  # T 细胞的 barcode 列表
+        bc_nalm6 = SPLIT_BAM_OUTPUT_NALM6  # Nalm6 细胞的 barcode 列表
+    output:
+        bam_t = SPLIT_BAM_Tsc,
+        bam_nalm6 = SPLIT_BAM_Nalm6sc
+    params: 
+        threads = THREADS
+    shell:
+        """
+        samtools view -D BC:{input.bc_t} -@ {params.threads} -o {output.bam_t} {input.bam}
+        samtools view -D BC:{input.bc_nalm6} -@ {params.threads} -o {output.bam_nalm6} {input.bam}
+        """
+
+
+rule SNP_calling:
+    input:
+        bam_t = SPLIT_BAM_Tsc,
+        bam_nalm6 = SPLIT_BAM_Nalm6sc,
+        GENOME = REFERENCE_GENOME,
+        GENOME_INDEX = REFERENCE_GENOME_INDEX
+    output:
+        bamaddrg_bam = bamaddrg_combined_BAM,
+        vcf = VCF_FILE,
+        tmp_region = TMP_REGION
+    params:
+        generate_regions_script = FASTA_GENERATE_REGIONS_SCRIPT
+    shell:
+        """
+        samtools index {input.bam_t}
+        samtools index {input.bam_nalm6}
+        {params.generate_regions_script} {input.GENOME_INDEX} 100000 > {output.tmp_region} 
+
+        bamaddrg -b {input.bam_t} -s Tsc -r group.Tsc \
+         -b {input.bam_nalm6} -s Nalm6 -r group.Nalm6 \
+         > {output.bamaddrg_bam}
+        samtools index {output.bamaddrg_bam}
+        
+        freebayes-parallel {output.tmp_region} 60 \
+            --min-mapping-quality 10 --min-base-quality 20 --min-alternate-count 5 -f {input.GENOME} \
+            {output.bamaddrg_bam} > {output.vcf}
+        """
+
+rule vcf_processing:
+    input:
+        vcf = VCF_FILE
+    output:
+       vcf_gz = VCF_FILE + ".gz",
+       vcf_snponly = VCF_FILE + "_snponly.vcf.gz",
+       vcf_snponly_simple = VCF_FILE + "_snponly_simple.vcf.gz",
+       vcf_0_1 = VCF_FILE + "_0_1.vcf.gz",
+       processed_vcf = PROCESSED_VCF_FILE
+    shell:
+        """
+        bcftools view {input.vcf} -Oz -o {output.vcf_gz}
+        bcftools filter -e 'TYPE!="snp"' -o {output.vcf_snponly} {output.vcf_gz}
+        bcftools annotate -x INFO,^FORMAT/GT, -o {output.vcf_snponly_simple} {output.vcf_snponly}
+        bcftools filter -e 'GT[0] != "0/0" && GT[0] != "0/1" && GT[0] != "1/0" && GT[0] != "1/1" || GT[1] != "0/0" && GT[1] != "0/1" && GT[1] != "1/0" && GT[1] != "1/1"' \
+            -o {output.vcf_0_1} {output.vcf_snponly_simple}
+        bcftools filter -e '(GT[0] == "0/1" && GT[1] == "0/1") || (GT[0] == "0/0" && GT[1] == "0/0") || (GT[0] == "1/1" && GT[1] == "1/1")' \
+            -o {output.processed_vcf} {output.vcf_0_1}
+        """
+# 注释：下面的程序的匹配性需要检验下
+
+rule SNP_distribution_per_gene:
+    input:
+        vcf = PROCESSED_VCF_FILE,
+        gtf = GTF_FILE
+    params:
+        output_dir = READ_SEPARATION_RESULTS_DIR,
+        script = SNP_distribution_per_gene_script
+    output:
+        SNP_COUNTS_PER_GENE_PATH,
+        COUNTS_DISTRIBUTION_PATH
+    log:
+        LOG_PATH_1
+    shell:
+        """
+        Rscript {params.script} --vcf {input.vcf} --gtf {input.gtf} \
+        --outputDir {params.output_dir} 
+        """        
+
+rule doublets_separation:
+    input:
+        yaml = Configfile,
+        vcf = PROCESSED_VCF_FILE,
+        bam = ZUMIS_BAM,
+        barcodelist = CELLBCs_FOR_READSEPARATION,
+        annotation = ANNOTATION
+    params:
+        subfolder = "read_separation_results", 
+        script = Doublets_separation_script
+    output:
+        TEM_RDS_PATH,
+        COUNTS_RDS_PATH,
+        NALM6_READID_PATH,
+        Tsc_READID_PATH
+    log:
+        LOG_PATH_2
+    shell:
+        """
+        Rscript {params.script} --yaml {input.yaml} --vcf {input.vcf} --bam {input.bam} \
+        -c {input.barcodelist} -f {params.subfolder} -a {input.annotation}
+        """
+
+rule doublets_separation_plotting:
+    input:
+        rds = TEM_RDS_PATH,
+        annotation = ANNOTATION
+    params:
+        output_dir = READ_SEPARATION_RESULTS_DIR,
+        script = Plotting_script
+    output:
+        READ_ASSIGNMENT_RESULT,
+        SCATTER_PLOT_HTML,
+        VIOLLIN_PLOT_HTML
+    log:
+        LOG_PATH_3
+    shell:
+        """
+        Rscript {params.script} --rds {input.rds} --annotation {input.annotation} \
+        --outdir {params.output_dir} 
+        """      
+
+rule read_separation_for_bam:
+    input:
+        nalm6_readID = NALM6_READID_PATH,
+        Tsc_readID = Tsc_READID_PATH,
+        bam = ZUMIS_BAM
+    params:
+        output_dir = READ_SEPARATION_RESULTS_DIR,
+        script = Sub_bam_script
+    output:
+        NALM6_SEPARATED_BAM_PATH,
+        Tsc_SEPARATED_BAM_PATH
+    shell:
+        """
+        chmod +x {params.script}
+        {params.script} {input.nalm6_readID} {input.bam} {params.output_dir} 50
+        {params.script} {input.Tsc_readID} {input.bam} {params.output_dir} 50
+        """      
+
+rule all:
+    input:
+        # zUMIs 输出的 bam 文件
+        zUMIs_bam = ZUMIS_BAM,
+
+        # zUMIs bam 的 index 文件
+        zUMIs_bam_index = ZUMIS_BAM + ".bai",
+
+        # SNP 变异检测最终结果
+        processed_vcf = PROCESSED_VCF_FILE,
+        
+        # SNP 在基因上的分布统计
+        snp_counts = SNP_COUNTS_PER_GENE_PATH,
+        counts_distribution = COUNTS_DISTRIBUTION_PATH,
+
+        # 双细胞（doublets）分离结果
+        nalm6_readid = NALM6_READID_PATH,
+        tsc_readid = Tsc_READID_PATH,
+
+        # 双细胞分离后 BAM 文件
+        separated_nalm6_bam = NALM6_SEPARATED_BAM_PATH,
+        separated_tsc_bam = Tsc_SEPARATED_BAM_PATH

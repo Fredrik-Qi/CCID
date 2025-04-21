@@ -1,0 +1,14 @@
+
+vcf: "/mnt/nvme/home/zhouhui/project_workspace/Tcell_NALM6_project/Freebayes_multi_samples_calling/Freebayes_multi_samples_calling_snponly_simple_Nalm6_TdT_only01_different_homo_hete.vcf.gz"
+bam: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/Tcell_dynamics.filtered.Aligned.GeneTagged.UBcorrected.sorted.bam"
+#bam: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/Tcell_dynamics.filtered.Aligned.GeneTagged.UBcorrected.sorted.subsampled_one_thousandth.bam"
+cellBCs: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/zUMIs_output/deconvolute_Mart1_Nalm6_snakemake_v0.6.0_MultiFreebayes_hetehomo/barcode_list_Nalm6_Mart1_all.txt"
+#cellBCs: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/SNP_verification_python_version1.0/barcodelist_Nalm6_TdT_all.txt"
+subfolder: "zUMIs_output/deconvolute_Mart1_Nalm6_snakemake_v0.6.0_MultiFreebayes_hetehomo"
+#subfolder: "zUMIs_output/deconvolute_TdT_Nalm6_snakemake_v0.6.0_MultiFreebayes_hetehomo"
+annotation: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/SNP_verification_R/barcode_annotation.txt"
+Script:
+  SNP_distribution_per_gene_script: "/mnt/nvme/home/zhouhui/project_workspace/Tcell_NALM6_project/Deconvolute_algorithm/DoubletSeparation_SNPbased_v0.6.0/Doublets_Separation_Distribution_of_SNPs_in_genes_v0.2.R"
+  Doublets_separation_script: "/mnt/nvme/home/zhouhui/project_workspace/Tcell_NALM6_project/Deconvolute_algorithm/DoubletSeparation_SNPbased_v0.6.0/DoubletsSeparation_SNPbased_v0.6.0_separation.R"
+  Plotting_script: "/mnt/nvme/home/zhouhui/project_workspace/Tcell_NALM6_project/Deconvolute_algorithm/DoubletSeparation_SNPbased_v0.6.0/DoubletsSeparation_SNPbased_v0.6.0_plotting.R"
+  Sub_bam_script: "/mnt/nvme/home/zhouhui/project_workspace/Tcell_NALM6_project/Deconvolute_algorithm/DoubletSeparation_SNPbased_v0.6.0/parallel_extract_bam.sh"

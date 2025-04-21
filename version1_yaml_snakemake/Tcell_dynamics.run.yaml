@@ -1,0 +1,93 @@
+# 通用信息 ----------------------------------------------------------- 
+
+project: Tcell_dynamics
+out_dir: /mnt/data/user/zhouhui/T_cells_dymamics_data_results/results
+
+sequence_files:
+  file1:
+    name: /mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/combined_fastq/combined_read_1.fastq.gz
+    base_definition:
+      - cDNA(25-150)
+      - UMI(12-21)
+    find_pattern: ATTGCGCAATG;2
+  file2:
+    name: /mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/combined_fastq/combined_read_2_cDNA.fastq.gz
+    base_definition:
+      - cDNA(1-150)
+  file3:
+    name: /mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/combined_fastq/combined_read_2_BC.fastq.gz
+    base_definition:
+      - BC(1-20)
+
+annotation: "/mnt/data/user/zhouhui/T_cells_dymamics_data_results/results/stats_all_0.txt"
+# 这里的annotation需要换成最全面的那一个，所以需要事先用ipynb的代码做一个手动的合并，在这里我们默认它已经存在
+# 这是一切的分析的第一步
+
+# 因此这整一个分析文件中有三处地方需要选择barcode list,第一个是zUMIs时；第二个是为SNP calling准备Tsc，Nalm6sc的bam文件时，
+#   需要指定的barcode list；第三个是做readseparation时，需要指定哪些细胞是希望被read separation的
+# 1) zUMIs时的barcode list
+zUMIs_barcode_list: &zUMIs_barcode_list /mnt/data/user/zhouhui/T_cells_dymamics_data_results/meta_data/expected_barcodes.txt
+
+# 2) SNP calling时的barcode list
+# 这个数据会由rule extract_barcodes生成，它的逻辑是根据Sort_Population进行分组（我们的实验里有Tsc,Nalm6sc,Nalm6-T这三种），
+#  然后将每个分组的XC_DNBPE存入barcode list文件
+
+# 3) readseparation时的barcode list
+# 这个cellBCs_FOR_READSEPARATION是做readseparation中需要选择的那些cell的barcode
+readseparation_barcode_list: "/mnt/data/user/zhouhui/Nalm6_Tcell/combined_data/zUMIs_secondrun/zUMIs_output/deconvolute_Mart1_Nalm6_snakemake_v0.6.0_MultiFreebayes_hetehomo/barcode_list_Nalm6_Mart1_all.txt"
+
+
+
+
+
+# ZUMIS信息 ----------------------------------------------------------- 
+# 注释：只需要更新下zUMIs_directory即可；而后需要更新一下barcode_file
+filter_cutoffs:
+  BC_filter:
+    num_bases: 5
+    phred: 20
+  UMI_filter:
+    num_bases: 4
+    phred: 20
+
+barcodes:
+  barcode_num: ~
+  barcode_file: *zUMIs_barcode_list
+  automatic: no
+  BarcodeBinning: 1
+  demultiplex: no
+  nReadsperCell: 100
+  discardReads: yes
+counting_opts:
+  introns: yes
+  downsampling: '0'
+  strand: 1
+  Ham_Dist: 1
+  velocyto: no
+  primaryHit: yes
+  twoPass: no
+make_stats: yes
+which_Stage: Filtering
+samtools_exec: samtools
+pigz_exec: pigz
+STAR_exec: STAR
+Rscript_exec: Rscript
+zUMIs_directory: /mnt/nvme/home/zhouhui/zUMIs_tabix-main
+read_layout: PE
+
+
+# 计算配置信息 ----------------------------------------------------------- 
+# 不需要更改
+num_threads: 60
+mem_limit: 100
+
+
+
+# 参考基因组信息 ----------------------------------------------------------- 
+# 注释：后期将这些数据打包封装即可
+reference:
+  STAR_index: /mnt/nvme/home/chris/resources/genomes/Human/STAR7idx_primary_noGTF
+  GTF_file: /mnt/nvme/home/chris/resources/genomes/Human/gencode.v42.primary_assembly.annotation.nochr.rRNA.gtf
+  additional_STAR_params: '--clip3pAdapterSeq CTGTCTCTTATACACATCT'
+  additional_files:
+

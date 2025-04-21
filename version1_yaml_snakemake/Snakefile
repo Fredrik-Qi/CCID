@@ -1,0 +1,140 @@
+
+# 1.Read the config file ------------------------------------------------------
+
+import yaml
+import os
+
+# 需要手动输入
+Program_path = "/mnt/data/user/zhouhui/CCID_pipeline"
+Configfile = os.path.join(Program_path, "config", "Tcell_dynamics.run.yaml")  
+algorithem_path = os.path.join(Program_path, "algorithem", "snakemake_pipeline")
+
+with open(Configfile, 'r') as f:
+    config = yaml.safe_load(f)
+
+
+
+# 1.Input files from config 基础信息 ----------------------------------------------
+# 输入文件和数据
+PROJECT_NAME = config['project']
+OUT_DIR = config['out_dir']
+ANNOTATION = config['annotation']
+CELLBCs_FOR_READSEPARATION = config['readseparation_barcode_list']
+
+GTF_FILE = config['reference']['GTF_file']
+THREADS = config['num_threads']
+ZUMIS_PATH = config['zUMIs_directory']
+
+# 2. Output files  ----------------------------------------------
+ZUMIS_OUTPUT_DIR = os.path.join(OUT_DIR, "zUMIs_output")
+os.makedirs(ZUMIS_OUTPUT_DIR, exist_ok=True)
+
+SPLIT_BAM_OUTPUT_DIR = os.path.join(OUT_DIR, "split_bam_output")
+os.makedirs(SPLIT_BAM_OUTPUT_DIR, exist_ok=True)
+
+READ_SEPARATION_RESULTS_DIR = os.path.join(OUT_DIR, "read_separation_results")
+os.makedirs(READ_SEPARATION_RESULTS_DIR, exist_ok=True)
+
+
+
+
+# 3.代码 ----------------------------------------------
+# 0) zUMIs相关
+ZUMIS_SCRIPT = os.path.join(ZUMIS_PATH, "zUMIs.sh")
+
+# 1) SNP calling相关
+split_bam_script = os.path.join(algorithem_path, "SNP_calling", "extract_barcodes_and_split_bam.sh")
+
+# 2）Read separation相关
+SNP_distribution_per_gene_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "Doublets_Separation_Distribution_of_SNPs_in_genes_v0.2.R")
+Doublets_separation_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "DoubletsSeparation_SNPbased_v0.6.0_separation.R")
+Plotting_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "DoubletsSeparation_SNPbased_v0.6.0_plotting.R")
+Sub_bam_script = os.path.join(algorithem_path, "DoubletSeparation_SNPbased_v1.0", "parallel_extract_bam.sh")
+
+
+
+# 4.程序生成的文件的信息标注  ----------------------------------------------
+
+# 1）zUMIs 产生的bam文件的路径
+ZUMIS_BAM = os.path.join(OUT_DIR, f"{PROJECT_NAME}.filtered.Aligned.GeneTagged.UBcorrected.sorted.bam")
+
+# 2）bam_split 产生的文件
+SPLIT_BAM_OUTPUT_T = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Tsc_subset_stats_all_0_cellBClist.txt")
+SPLIT_BAM_OUTPUT_NALM6 = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6sc_subset_stats_all_0_cellBClist.txt")
+SPLIT_BAM_OUTPUT_DOUBLETS = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6-T_subset_stats_all_0_cellBClist.txt")
+
+SPLIT_BAM_Tsc = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Tsc_subset.bam")
+SPLIT_BAM_Nalm6sc = os.path.join(SPLIT_BAM_OUTPUT_DIR, "Nalm6sc_subset.bam")
+# 3）SNP calling
+#VCF_FILE = ... 待写
+
+
+## 4）Output files for Rule SNP_distribution_per_gene ----------------------
+SNP_COUNTS_PER_GENE_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "snp_counts_per_gene.csv")
+COUNTS_DISTRIBUTION_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "snp_count_frequency_distribution.pdf")
+LOG_PATH_1 = os.path.join(READ_SEPARATION_RESULTS_DIR, "SNP_distribution_per_gene.processing_log.txt")
+
+# 5）Output files for Rule doublets_separation -----------------------------
+TEM_RDS_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.tmp.rds")
+COUNTS_RDS_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.separated_counts.rds")
+NALM6_READID_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Nalm6_readIDs.txt")
+TDT_READID_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.TdT_readIDs.txt")
+LOG_PATH_2 = os.path.join(READ_SEPARATION_RESULTS_DIR, "doublets_separation.processing_log.txt")
+
+# 6）Output files for Rule doublets_separation_plotting -----------------------------
+READ_ASSIGNMENT_RESULT = os.path.join(READ_SEPARATION_RESULTS_DIR, "final_read_assignment_result_sorted.txt")
+SCATTER_PLOT_HTML = os.path.join(READ_SEPARATION_RESULTS_DIR, "scatterplots_summary.html")
+VIOLLIN_PLOT_HTML = os.path.join(READ_SEPARATION_RESULTS_DIR, "violin_plots_summary.html")
+LOG_PATH_3 = os.path.join(READ_SEPARATION_RESULTS_DIR, "doublets_separation_plotting.processing_log.txt")
+
+# 7) Output files for Rule read_separation_for_bam
+NALM6_SEPARATED_BAM_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.Nalm6_readIDs_separated_bam.bam")
+TDT_SEPARATED_BAM_PATH = os.path.join(READ_SEPARATION_RESULTS_DIR, "Tcell_dynamics.TdT_readIDs_separated_bam.bam")
+
+
+
+rule extract_barcodes:
+    input:
+        barcode = ANNOTATION  
+    output:
+        SPLIT_BAM_OUTPUT_NALM6,
+        SPLIT_BAM_OUTPUT_T,
+        SPLIT_BAM_OUTPUT_DOUBLETS
+    params:
+        script = split_bam_script,  
+        output_path = SPLIT_BAM_OUTPUT_DIR  
+    log:
+        "logs/extract_barcodelist.log"
+    shell:
+        """
+        chmod +x {params.script}
+        bash {params.script} {input.barcode} {params.output_path}
+        """
+
+rule run_zUMIs:
+    input:
+        config_file = Configfile
+    params:
+        script = ZUMIS_SCRIPT
+    output:
+        ZUMIS_BAM
+    log:
+        "logs/zUMIs.log"
+    shell:
+        "{params.script} -c -y {input.config_file}"
+
+rule split_bam:
+    input:
+        bam = ZUMIS_BAM,
+        bc_t = SPLIT_BAM_OUTPUT_T,  # T 细胞的 barcode 列表
+        bc_nalm6 = SPLIT_BAM_OUTPUT_NALM6  # Nalm6 细胞的 barcode 列表
+    output:
+        bam_t = SPLIT_BAM_Tsc,
+        bam_nalm6 = SPLIT_BAM_Nalm6sc
+    params: 
+        threads = THREADS
+    shell:
+        """
+        samtools view -D BC:{input.bc_t} -@ {params.threads} -o {output.bam_t} {input.bam}
+        samtools view -D BC:{input.bc_nalm6} -@ {params.threads} -o {output.bam_nalm6} {input.bam}
+        """

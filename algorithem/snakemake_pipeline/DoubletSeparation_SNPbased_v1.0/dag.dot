@@ -1,0 +1,6 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "SNP_distribution_per_gene", color = "0.00 0.6 0.85", style="rounded,dashed"];
+}            

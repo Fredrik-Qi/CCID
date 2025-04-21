@@ -1,2 +1,2 @@
-# CCID
-A version For master thesis
+# CCID1.0
+Cell-Cell Interaction Decomposition Based on SNPs
